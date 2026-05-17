@@ -1,0 +1,20 @@
+{
+  "name": "local-sf-manifest-pipeline-marketplace",
+  "interface": {
+    "displayName": "Local SF Manifest Pipeline"
+  },
+  "plugins": [
+    {
+      "name": "sf-manifest-pipeline",
+      "source": {
+        "source": "local",
+        "path": "./plugins/sf-manifest-pipeline"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

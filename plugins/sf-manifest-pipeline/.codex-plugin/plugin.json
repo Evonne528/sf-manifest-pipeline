@@ -1,0 +1,35 @@
+{
+  "name": "sf-manifest-pipeline",
+  "version": "0.1.0",
+  "description": "Leader workflow for Salesforce projects without a centralized repository: initialize local version control, retrieve scoped org metadata, analyze changes, and learn future retrieve scope from change history.",
+  "author": {
+    "name": "Local Codex User"
+  },
+  "license": "MIT",
+  "keywords": [
+    "salesforce",
+    "metadata",
+    "review",
+    "leader",
+    "collaboration"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "SF Manifest Pipeline",
+    "shortDescription": "Retrieve and review project-relevant Salesforce metadata for tech leaders.",
+    "longDescription": "Supports teams that do not share a centralized source repository. The plugin initializes local Git when needed, keeps a project-specific coding standard file, generates chunked full manifests for first use, retrieves metadata from the current org, produces change-review reports, records frequently changed metadata, and uses history to narrow future retrieve scope.",
+    "developerName": "Local Codex User",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Code Review",
+      "Salesforce Metadata",
+      "Local Automation"
+    ],
+    "defaultPrompt": [
+      "Initialize this Salesforce project for manifest pipeline review.",
+      "Generate a chunked first-use package.xml from the current org and retrieve the metadata.",
+      "Analyze the latest retrieved metadata changes against the project standards and update the change-frequency history."
+    ],
+    "brandColor": "#2563EB"
+  }
+}
