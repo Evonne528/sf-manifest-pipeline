@@ -19,7 +19,51 @@ The workflow assumes the user has a local project folder. If it is not under Git
 - `.leader-review/manifests/`: generated full and scoped package manifests.
 - `.leader-review/reports/`: review reports.
 
-## Standard Workflow
+## Subflows
+
+Prefer these subflows when the user describes a leader workflow in natural language.
+
+1. One-time bootstrap:
+
+```bash
+python3 plugins/sf-manifest-pipeline/scripts/sf_manifest_pipeline.py once --org <alias-or-username> --max-members 500
+```
+
+Use this only for initial setup. It initializes local Git/state, generates a full org manifest, splits it into chunks, and retrieves each chunk unless `--skip-retrieve` is passed.
+
+2. Refresh snapshot:
+
+```bash
+python3 plugins/sf-manifest-pipeline/scripts/sf_manifest_pipeline.py snapshot --org <alias-or-username>
+```
+
+Use this for normal recurring refreshes. It generates a history-guided smart manifest and retrieves only that scoped snapshot.
+
+3. Review after refresh:
+
+```bash
+python3 plugins/sf-manifest-pipeline/scripts/sf_manifest_pipeline.py review
+```
+
+Use this after `snapshot`. It analyzes current Git changes, writes a review report, and appends change records to history.
+
+4. Occasional churn analysis:
+
+```bash
+python3 plugins/sf-manifest-pipeline/scripts/sf_manifest_pipeline.py churn --lookback-days 120 --top 20
+```
+
+Use this when the leader wants to know which metadata changes frequently.
+
+5. Codify findings as standards:
+
+```bash
+python3 plugins/sf-manifest-pipeline/scripts/sf_manifest_pipeline.py codify --rule "Flow changes must document trigger conditions and rollback plan."
+```
+
+Use this when the user confirms a review finding should become a project-specific standard.
+
+## Low-Level Commands
 
 1. Initialize the workspace:
 

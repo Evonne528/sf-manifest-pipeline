@@ -278,6 +278,99 @@ def analyze(_: argparse.Namespace) -> None:
     print(f"Wrote {report_path}")
 
 
+def subflow_once(args: argparse.Namespace) -> None:
+    init_workspace(args)
+    generate_full_manifest(args)
+    if not args.skip_retrieve:
+        retrieve(argparse.Namespace(
+            org=args.org,
+            manifest_dir=str(MANIFEST_DIR / "chunks"),
+            wait=args.wait,
+        ))
+    print("One-time setup complete. Commit the retrieved baseline before running future snapshots.")
+
+
+def subflow_snapshot(args: argparse.Namespace) -> None:
+    smart_manifest(args)
+    retrieve(argparse.Namespace(
+        org=args.org,
+        manifest_dir=str(MANIFEST_DIR / "smart" / "chunks"),
+        wait=args.wait,
+    ))
+
+
+def subflow_review(args: argparse.Namespace) -> None:
+    analyze(args)
+
+
+def subflow_churn(args: argparse.Namespace) -> None:
+    ensure_state()
+    records = filter_history(read_history(), args.lookback_days)
+    type_counts = Counter(record.get("metadataType") or "Unknown" for record in records)
+    component_counts = Counter(
+        f"{record.get('metadataType') or 'Unknown'}:{record.get('metadataName') or record.get('path')}"
+        for record in records
+    )
+    timestamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    report_path = REPORT_DIR / f"churn-{timestamp}.md"
+    lines = [
+        "# Metadata Churn Report",
+        "",
+        f"- Generated at: {now_iso()}",
+        f"- Lookback days: {args.lookback_days}",
+        f"- History records: {len(records)}",
+        "",
+        "## Frequent Metadata Types",
+        "",
+    ]
+    if type_counts:
+        lines.extend(f"- {metadata_type}: {count}" for metadata_type, count in type_counts.most_common(args.top))
+    else:
+        lines.append("- No history records matched.")
+    lines.extend(["", "## Frequent Components", ""])
+    if component_counts:
+        lines.extend(f"- {component}: {count}" for component, count in component_counts.most_common(args.top))
+    else:
+        lines.append("- No history records matched.")
+    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Wrote {report_path}")
+
+
+def filter_history(records: list[dict], lookback_days: int) -> list[dict]:
+    cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=lookback_days)
+    filtered = []
+    for record in records:
+        try:
+            record_time = dt.datetime.fromisoformat(record["timestamp"])
+        except Exception:
+            continue
+        if record_time >= cutoff:
+            filtered.append(record)
+    return filtered
+
+
+def subflow_codify(args: argparse.Namespace) -> None:
+    ensure_state()
+    rules = args.rule or []
+    if args.file:
+        rules.extend([
+            line.strip()
+            for line in Path(args.file).read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ])
+    if not rules:
+        raise SystemExit("Provide at least one --rule or --file.")
+    timestamp = dt.datetime.now().strftime("%Y-%m-%d")
+    existing = STANDARDS_FILE.read_text(encoding="utf-8")
+    with STANDARDS_FILE.open("a", encoding="utf-8") as fh:
+        if existing and not existing.endswith("\n"):
+            fh.write("\n")
+        fh.write(f"\n## Learned Standards - {timestamp}\n\n")
+        for rule in rules:
+            fh.write(f"- {rule}\n")
+    print(f"Appended {len(rules)} rule(s) to {STANDARDS_FILE}")
+
+
 def git_lines(cmd: list[str]) -> list[str]:
     result = run(cmd, check=False)
     if result.returncode != 0:
@@ -391,6 +484,27 @@ def now_iso() -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="SF manifest pipeline for Salesforce metadata review")
     sub = parser.add_subparsers(dest="command", required=True)
+    once = sub.add_parser("once", help="One-time setup: init, full manifest, and optional full retrieve.")
+    once.add_argument("--org", required=True)
+    once.add_argument("--max-members", type=int)
+    once.add_argument("--wait", type=int, default=60)
+    once.add_argument("--skip-retrieve", action="store_true")
+    once.set_defaults(func=subflow_once)
+    snapshot = sub.add_parser("snapshot", help="Refresh a metadata snapshot using history-guided smart scope.")
+    snapshot.add_argument("--org", required=True)
+    snapshot.add_argument("--metadata", action="append", default=[])
+    snapshot.add_argument("--max-members", type=int, default=500)
+    snapshot.add_argument("--wait", type=int, default=60)
+    snapshot.set_defaults(func=subflow_snapshot)
+    sub.add_parser("review", help="Review the latest refreshed snapshot changes.").set_defaults(func=subflow_review)
+    churn = sub.add_parser("churn", help="Report frequently changed metadata from local history.")
+    churn.add_argument("--lookback-days", type=int, default=120)
+    churn.add_argument("--top", type=int, default=20)
+    churn.set_defaults(func=subflow_churn)
+    codify = sub.add_parser("codify", help="Append confirmed findings to the project standards file.")
+    codify.add_argument("--rule", action="append", default=[])
+    codify.add_argument("--file")
+    codify.set_defaults(func=subflow_codify)
     sub.add_parser("init").set_defaults(func=init_workspace)
     full = sub.add_parser("full-manifest")
     full.add_argument("--org", required=True)
